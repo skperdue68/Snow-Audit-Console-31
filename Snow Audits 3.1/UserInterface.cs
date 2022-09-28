@@ -122,9 +122,9 @@ namespace SnowAudit
         //Clear Console and optionally set background and foreground colors.
         internal static void ClearConsole(ConsoleColor foregroundColor = ConsoleColor.White, ConsoleColor backgroundColor = ConsoleColor.DarkBlue)
         {
-            Console.Clear();
             Console.ForegroundColor = ConsoleColor.White;
             Console.BackgroundColor = ConsoleColor.DarkBlue;
+            Console.Clear();
         }
 
 
