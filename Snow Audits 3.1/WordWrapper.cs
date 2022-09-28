@@ -7,12 +7,13 @@
 //============================================================================
 
 using System;
+using System.Xml;
 
 namespace WordWrapper
 {
     class WordWrapper
     {
-        public static void Wrap(string paragraphToWrap)
+        public static void Wrap(string paragraphToWrap, bool newLine)
         {
 
             //variables
@@ -31,7 +32,14 @@ namespace WordWrapper
             // text doesn't need to be wrapped
             if (totalLines <= 0)
             {
-                Console.WriteLine(paragraphToWrap);
+                if (newLine)
+                {
+                    Console.WriteLine(paragraphToWrap);
+                }
+                else
+                {
+                    Console.Write(paragraphToWrap);
+                }
             }
             else
             {
@@ -52,14 +60,29 @@ namespace WordWrapper
                     // print the line
                     // decrement the number of lines
                     paragraphToWrap = paragraphToWrap.Substring(j + 1);
-                    Console.WriteLine(line);
+                    if (newLine)
+                    {
+                        Console.WriteLine(line);
+                    }
+                    else
+                    {
+                        Console.Write(line);
+                    }
+
                     totalLines--;
                 }
 
                 // this prints the very last line that doesn't go to window edge
                 if (remainderLines > 0)
                 {
-                    Console.WriteLine(paragraphToWrap);
+                    if (newLine)
+                    {
+                        Console.WriteLine(paragraphToWrap);
+                    }
+                    else
+                    {
+                        Console.Write(paragraphToWrap);
+                    }
                 }
 
             }

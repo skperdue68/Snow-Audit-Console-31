@@ -52,6 +52,8 @@ namespace SnowAudit
             //Create Databases as necessary and clear/create tables as needed.
             DatabaseOperations.Initialize();
 
+            UserInterface.AuditReview();
+
             DataSet ds = new DataSet();
             // Read the Excel File
             ds = DatabaseOperations.ReadExcel(ds);
@@ -60,7 +62,9 @@ namespace SnowAudit
             DatabaseOperations.AutoSqlBulkCopy(ds);
 
             //Run SQL aganst database to create the Audit Results and save outut
+            UserInterface.ClearConsole();
             DatabaseOperations.PerformAudit();
+            UserInterface.Logger("");
             UserInterface.Logger(@$"Audit Completed.  Results available as '{AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx'.");
             UserInterface.Pause();
             goto GETSERVERGROUP;

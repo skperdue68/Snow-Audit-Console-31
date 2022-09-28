@@ -128,6 +128,8 @@ namespace SnowAudit
 
         internal static DataSet ReadExcel(DataSet ds)
         {
+            UserInterface.LoggerChangeColors("READING INPUT FILES", ConsoleColor.White, ConsoleColor.Blue);
+            UserInterface.LoggerChangeColors("", ConsoleColor.DarkBlue, ConsoleColor.White);
             string dbName = AuditProperties.dbAuditPrefix + AuditProperties.dbServer;
             DataTable dt = new DataTable();
 
@@ -142,7 +144,6 @@ namespace SnowAudit
 
         public static DataTable GetDataTableFromExcel(string filePath, string tableName, string sheetname = "", bool hasHeader = true)
         {
-
             using (var workbook = new XLWorkbook(filePath))
             {
                 IXLWorksheet worksheet;
@@ -160,7 +161,7 @@ namespace SnowAudit
                 tbl.TableName = tableName;
                 for (int col = rangeColFirst; col <= rangeColLast; col++)
                     tbl.Columns.Add(hasHeader ? worksheet.FirstRowUsed().Cell(col).Value.ToString() : $"Column {col}");
-                UserInterface.Logger($"Reading data for {tableName}...");
+                UserInterface.Logger($"Reading data for {tableName}...", false);
                 rangeRowFirst = rangeRowFirst + (hasHeader ? 1 : 0);
                 var colCount = rangeColLast - rangeColFirst;
                 for (int rowNum = rangeRowFirst; rowNum <= rangeRowLast; rowNum++)
@@ -172,6 +173,7 @@ namespace SnowAudit
                     }
                     tbl.Rows.Add(colValues.ToArray());
                 }
+                UserInterface.Logger($"done!");
                 return tbl;
             }
         }
@@ -224,6 +226,8 @@ namespace SnowAudit
 
         internal static void PerformAudit()
         {
+            UserInterface.LoggerChangeColors("PERFORMING AUDIT", ConsoleColor.White, ConsoleColor.Blue);
+            UserInterface.LoggerChangeColors("", ConsoleColor.DarkBlue, ConsoleColor.White);
             string outputFile = @$"{AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx";
             using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
@@ -241,11 +245,12 @@ namespace SnowAudit
                 // Loop over non-production servers and compare production server > non production for missing servers.
                 foreach (string server in AuditProperties.servers)
                 {
-                    UserInterface.Logger($"Searching missing values {AuditProperties.productionServer} > {server}...");
+                    UserInterface.Logger($"Searching missing values {AuditProperties.productionServer} > {server}...", false);
                     string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{AuditProperties.productionServer}' AS 'Primary Instance', '{server}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {AuditProperties.productionServer} T1 LEFT JOIN {server} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                     SqlCommand sql = new SqlCommand(query, dbConn);
                     SqlDataAdapter sda = new SqlDataAdapter(sql);
                     sda.Fill(dt);
+                    UserInterface.Logger("done!");
                 }
 
                 // Loop over each non-production server
@@ -254,11 +259,12 @@ namespace SnowAudit
                     //  Compare non-prod > prod for missing values
                     if (server != AuditProperties.productionServer)
                     {
-                        UserInterface.Logger($"Searching missing values {server} > {AuditProperties.productionServer}...");
+                        UserInterface.Logger($"Searching missing values {server} > {AuditProperties.productionServer}...", false);
                         string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{AuditProperties.productionServer}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {AuditProperties.productionServer} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                         SqlCommand sql = new SqlCommand(query, dbConn);
                         SqlDataAdapter sda = new SqlDataAdapter(sql);
                         sda.Fill(dt);
+                        UserInterface.Logger("done!");
                     }
 
                     // Second loop of servers list
@@ -267,11 +273,12 @@ namespace SnowAudit
                         // Compare non-prod > other non-prod for missing values
                         if (server != innerServer && server != AuditProperties.productionServer)
                         {
-                            UserInterface.Logger($"Searching missing values {server} > {innerServer}...");
+                            UserInterface.Logger($"Searching missing values {server} > {innerServer}...", false);
                             string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{innerServer}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {innerServer} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                             SqlCommand sql = new SqlCommand(query, dbConn);
                             SqlDataAdapter sda = new SqlDataAdapter(sql);
                             sda.Fill(dt);
+                            UserInterface.Logger("done!");
                         }
                     }
                 }
@@ -282,11 +289,12 @@ namespace SnowAudit
                 //Search prod server for mismatches against non-prod servers
                 foreach (string server in AuditProperties.servers)
                 {
-                    UserInterface.Logger($"Searching value mismatch {AuditProperties.productionServer} > {server}......");
+                    UserInterface.Logger($"Searching value mismatch {AuditProperties.productionServer} > {server}......", false);
                     string query = @$"SELECT 'Value Mismatch' AS Issue, T1.Name AS 'Property Name', '{AuditProperties.productionServer}' AS 'Primary Instance', '{server}' AS 'Secondary Instance', ISNULL(T3.Value, '') AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', T2.Value AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {AuditProperties.productionServer} T1 LEFT JOIN {server} T2 ON T1.name = T2.name LEFT JOIN {AuditProperties.productionServer} T3 ON T1.Name = T3.Name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T1.Value != T2.Value  AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                     SqlCommand sql = new SqlCommand(query, dbConn);
                     SqlDataAdapter sda = new SqlDataAdapter(sql);
                     sda.Fill(dt);
+                    UserInterface.Logger("done!");
                 }
                 mismatchDone.Add(AuditProperties.productionServer, "done");
 
@@ -297,11 +305,12 @@ namespace SnowAudit
                     {
                         if (!mismatchDone.ContainsKey(innerServer) && server != innerServer)
                         {
-                            UserInterface.Logger($"Searching value mismatch {server} > {innerServer}...");
+                            UserInterface.Logger($"Searching value mismatch {server} > {innerServer}...",false);
                             string query = @$"SELECT 'Value Mismatch' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{innerServer}' AS 'Secondary Instance', ISNULL(T3.Value, '') AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', T2.Value AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {innerServer} T2 ON T1.name = T2.name LEFT JOIN {AuditProperties.productionServer} T3 ON T1.Name = T3.Name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T1.Value != T2.Value AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                             SqlCommand sql = new SqlCommand(query, dbConn);
                             SqlDataAdapter sda = new SqlDataAdapter(sql);
                             sda.Fill(dt);
+                            UserInterface.Logger("done!");
                         }
                     }
                     mismatchDone.Add(server, "done");

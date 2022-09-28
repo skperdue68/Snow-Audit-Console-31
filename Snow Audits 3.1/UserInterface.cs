@@ -2,6 +2,9 @@
 using System.Linq;
 using System;
 using System.Text.RegularExpressions;
+using System.IO.Pipes;
+using DocumentFormat.OpenXml.Office2010.ExcelAc;
+using System.Collections.Generic;
 
 namespace SnowAudit
 {
@@ -15,9 +18,9 @@ namespace SnowAudit
             ClearConsole();
             Logger($"ServiceNOW Audits was created to assist in automating completing properties audits for ServiceNOW.");
             Logger($"\r\nExport the necessary property list(s) from ServiceNOW, saving them as Excel Files.");
-            Logger($"\r\nSave files as the name of the instance you are exporting (i.e. attbdas, attbdasdev, attfedgov1, attfedgov1test, etc) in '<color>{inputFilePath}</color>.'", ConsoleColor.DarkYellow);
+            Logger($"\r\nSave files as the name of the instance you are exporting (i.e. attbdas, attbdasdev, attfedgov1, attfedgov1test, etc) in '<color>{inputFilePath}</color>.'", true, ConsoleColor.DarkYellow);
             Logger($"\r\nThe application will automatically attempt to determine which file(s) are appropriate based on the server group selected.");
-            Logger($"\r\nUpon completion of the audit your results will be found in '<color>{outputFilePath}</color>'.", ConsoleColor.DarkYellow);
+            Logger($"\r\nUpon completion of the audit your results will be found in '<color>{outputFilePath}</color>'.", true, ConsoleColor.DarkYellow);
             Pause();
         }
 
@@ -88,35 +91,56 @@ namespace SnowAudit
             switch (errorCode)
             {
                 case "File 1":
-                    Logger($"ERROR: An input file for production server {inputFilePath}{AuditProperties.productionServer}.xlsx not found.", ConsoleColor.DarkRed);
+                    Logger($"ERROR: An input file for production server {inputFilePath}{AuditProperties.productionServer}.xlsx not found.", true, ConsoleColor.DarkRed);
                     break;
                 case "File 2":
-                    Logger("ERROR: A required input file for at least one non-production server to compare was not found.", ConsoleColor.DarkRed);
+                    Logger("ERROR: A required input file for at least one non-production server to compare was not found.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 1":
-                    Logger("ERROR: Unable to connect to to the database server.", ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to connect to to the database server.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 2":
-                    Logger("ERROR: There is an issue with the exemtion table.", ConsoleColor.DarkRed);
+                    Logger("ERROR: There is an issue with the exemtion table.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 3":
-                    Logger("ERROR: There is an issue verifying or creating the audit database tables.", ConsoleColor.DarkRed);
+                    Logger("ERROR: There is an issue verifying or creating the audit database tables.", true,ConsoleColor.DarkRed);
                     break;
                 case "Database 4":
-                    Logger("ERROR: Unable to remove existing audit server data tables.", ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to remove existing audit server data tables.", true, ConsoleColor.DarkRed);
                     Logger(errorText);
                     break;
                 case "Database 5":
-                    Logger("ERROR: Unable to create audit server data tables.", ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to create audit server data tables.", true,ConsoleColor.DarkRed);
                     break;
                 case "Database 6":
-                    Logger("ERROR: Unable to import server data to database.", ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to import server data to database.", true,ConsoleColor.DarkRed);
                     break;
                 case "Database 7":
-                    Logger("ERROR: Unable to save output file.", ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to save output file.", true, ConsoleColor.DarkRed);
                     break;
             }
             Environment.Exit(0);
+        }
+
+        internal static void AuditReview()
+        {
+            ClearConsole();
+            LoggerChangeColors("AUDIT REVIEW", ConsoleColor.White, ConsoleColor.Blue);
+            LoggerChangeColors("", ConsoleColor.DarkBlue, ConsoleColor.White);
+            Logger("About to perform audit with the following settings:");
+            Logger("");
+            Logger($"Audit Type: {AuditProperties.auditType}");
+            Logger($"Server Group: {AuditProperties.serverGroup}");
+            List<string> servers = AuditProperties.servers;
+            Logger($"Audit Inputs: ");
+            foreach (string server in servers)
+            {
+                Logger($"   {server} - {inputFilePath}{server}.xlsx");
+            }
+            Logger($"Audit Output: {AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx");
+            Logger("");
+            Pause();
+            ClearConsole();
         }
 
         //Clear Console and optionally set background and foreground colors.
@@ -133,12 +157,12 @@ namespace SnowAudit
         {
             Console.ForegroundColor = ForegroundColor;
             Console.BackgroundColor = BackgroundColor;
-            WordWrapper.WordWrapper.Wrap(message);
+            WordWrapper.WordWrapper.Wrap(message, true);
 
         }
 
         //Display a line with a color highlighted portion.
-        internal static void Logger(string message, ConsoleColor newColor = ConsoleColor.White)
+        internal static void Logger(string message, bool newLine = true, ConsoleColor newColor = ConsoleColor.White)
         {
 
             // Set defaults
@@ -166,7 +190,7 @@ namespace SnowAudit
                     {
                         messageNoWrap = messagePiece;
                     }
-                    WordWrapper.WordWrapper.Wrap(messageNoWrap);
+                    WordWrapper.WordWrapper.Wrap(messageNoWrap, newLine);
                     if (isMessageWrapped)
                     {
                         Console.ForegroundColor = originalColor;
