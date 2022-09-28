@@ -1122,11 +1122,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\skper\\source\\repos\\Snow Audits 3.1 Console\\Snow Audits 3.1\\SnowAudit.csproj",
+      "projectUniqueName": "C:\\Users\\skper\\source\\repos\\Snow-Audit-Console-31\\Snow Audits 3.1\\SnowAudit.csproj",
       "projectName": "SnowAudit",
-      "projectPath": "C:\\Users\\skper\\source\\repos\\Snow Audits 3.1 Console\\Snow Audits 3.1\\SnowAudit.csproj",
+      "projectPath": "C:\\Users\\skper\\source\\repos\\Snow-Audit-Console-31\\Snow Audits 3.1\\SnowAudit.csproj",
       "packagesPath": "C:\\Users\\skper\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\skper\\source\\repos\\Snow Audits 3.1 Console\\Snow Audits 3.1\\obj\\",
+      "outputPath": "C:\\Users\\skper\\source\\repos\\Snow-Audit-Console-31\\Snow Audits 3.1\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\skper\\AppData\\Roaming\\NuGet\\NuGet.Config",

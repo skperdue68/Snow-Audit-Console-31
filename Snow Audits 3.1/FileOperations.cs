@@ -1,43 +1,49 @@
-﻿using System;
-using System.Collections;
+﻿using DocumentFormat.OpenXml.Office.CustomUI;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web;
 
 namespace SnowAudit
 {
     internal static class FileOperations
     {
-        public static void Initialize()
+        static string inputFilePath = AuditProperties.inputFilePath;
+        static string outputFilePath = AuditProperties.outputFilePath;
+        static string productionServer = AuditProperties.productionServer;
+        static List<string> servers = AuditProperties.servers;
+
+
+        internal static void Initialize()
         {
             CreateAuditDirectory();
-            CheckAuditFiles();
+            GatherAuditInputFiles();
         }
 
-        public static void CreateAuditDirectory()
+        internal static void CreateAuditDirectory()
         {
-            // Create the Audit Directory if it does not exist.
-            Directory.CreateDirectory(AuditProperties.inputFilePath);
-            Directory.CreateDirectory(AuditProperties.outputFilePath);
+            // Create the Input and Output Directories if necessary.
+            Directory.CreateDirectory(inputFilePath);
+            Directory.CreateDirectory(outputFilePath);
         }
 
-        public static void CheckAuditFiles()
+        //Check which file(s) are present in the input directory based on your instance to audit and create a list of the results.
+        internal static void GatherAuditInputFiles()
         {
-            string inputFilePath = AuditProperties.inputFilePath;
-            string productionServer = AuditProperties.productionServer;
-            List<string> servers = AuditProperties.servers;
             List<string> inputFiles = new List<string>();
+
+            //Look specifically for production server as this is always required.
             if (!File.Exists(inputFilePath + productionServer + ".xlsx"))
             {
-                UserInterface.ShowInputFileError(1);
+                UserInterface.ShowError("File 1", "");
             }
+            else
+            {
+                inputFiles.Add(productionServer);
+            }
+            //Examine remaining possible server(s) files.
             foreach (string server in servers)
             {
-                if (server != AuditProperties.productionServer)
+                if (server != productionServer)
                 {
                     if (File.Exists(inputFilePath + server + ".xlsx"))
                     {
@@ -45,13 +51,15 @@ namespace SnowAudit
                     }
                 }
             }
-            if (inputFiles.Count < 1)
+
+            // If there are not at least 2 input files (one being production and the other being one or more of the remaining options, display error and exit.
+            if (inputFiles.Count < 2)
             {
-                UserInterface.ShowInputFileError(2);
+                UserInterface.ShowError("File 2", "");
             }
-            // Save list of servers based on Input Files found."
+
+            // Save list of servers from the serverGroup with input files.
             AuditProperties.servers.Clear();
-            AuditProperties.servers.Add(productionServer);
             AuditProperties.servers.AddRange(inputFiles.ToArray());
         }
     }

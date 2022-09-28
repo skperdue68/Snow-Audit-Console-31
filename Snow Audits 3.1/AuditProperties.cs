@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System;
 
 namespace SnowAudit
 {
@@ -28,14 +21,14 @@ namespace SnowAudit
         public static Dictionary<string, int> columnWidths = new Dictionary<string, int>();
         public static bool wrapRows = false;
 
-        public static void SetAuditTypeInfo(int auditType)
+        internal static void SetAuditTypeParameters(int auditType)
         {
             switch (auditType)
             {
+                // Define Information Necessar for system proertes audit and output.
                 case 1:
                     {
                         AuditProperties.dbAuditPrefix = "sys_prop";
-                        AuditProperties.dbAuditTableStructure = "([Name] nvarchar(255) NULL,[Value] nvarchar(max) NULL,[Type] nvarchar(255) NULL,[Application] nvarchar(255) NULL,[Description] nvarchar(max) NULL,[Updated] datetime NULL,[Updated by] nvarchar(255) NULL)";
                         AuditProperties.outputFreezeCols = 2;
                         AuditProperties.outputFreezeRows = 1;
                         AuditProperties.columnWidths.Clear();
@@ -55,10 +48,11 @@ namespace SnowAudit
             }
         }
 
-        public static void SetServerGroupInfo(string serverGroup)
+        internal static void SetServerGroupParameters(string serverGroup)
         {
             switch (serverGroup)
             {
+                // Set information necessary to define the BDAS servers.
                 case "BDAS":
                     {
                         productionServer = "attbdas";
@@ -76,6 +70,8 @@ namespace SnowAudit
                         servers.Add("attbdasdev7");
                         break;
                     }
+
+                // Set information necessary to define the fusion servers.
                 case "FUSION":
                     {
                         productionServer = "attfusion";
@@ -86,6 +82,8 @@ namespace SnowAudit
                         servers.Add("attfusiondev");
                         break;
                     }
+
+                // Set information necessary to define the FedGov servers.
                 case "FEDGOV":
                     {
                         productionServer = "attfedgov1";

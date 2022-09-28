@@ -1,35 +1,35 @@
 ﻿using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Presentation;
 using System.Collections.Generic;
 using System;
 using System.Configuration;
 using System.Data;
 using System.Data.OleDb;
 using System.Data.SqlClient;
-using System.Data.SqlTypes;
-using System.Drawing;
-using System.Xml.Linq;
+using System.Linq;
+using System.Text;
 
 namespace SnowAudit
 {
     internal static class DatabaseOperations
     {
-        private static string DBConnectionString = ConfigurationManager.ConnectionStrings["database"].ConnectionString;
+        private static string dbConnectionString = ConfigurationManager.ConnectionStrings["database"].ConnectionString;
+        private static string exemptionsDatabase = AuditProperties.exemptionsDatabase;
+        private static string exemptionsTable = AuditProperties.exemptionsTable;
+        private static string inputFilePath = AuditProperties.inputFilePath;
 
-        public static void Initialize()
+        internal static void Initialize()
         {
             CheckDBConnection();
-            CheckForExemptionsDB(AuditProperties.exemptionsDatabase, AuditProperties.exemptionsTable);
+            CheckForExemptionsDB(exemptionsDatabase, exemptionsTable);
             string dbName = AuditProperties.dbAuditPrefix + AuditProperties.dbServer + "audit";
-            DropAuditDB(dbName);
-            CreateAuditDB(dbName);
-            DBConnectionString = DBConnectionString + $"Initial Catalog={dbName};";
-            CreateAuditTable(dbName);
+            CheckForAuditDB(dbName);
+            dbConnectionString = dbConnectionString + $"Initial Catalog={dbName};";
+            RemoveAuditTables(dbName);
         }
 
         private static void CheckDBConnection()
         {
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
                 try
                 {
@@ -40,8 +40,7 @@ namespace SnowAudit
                 }
                 catch (Exception ex)
                 {
-                    UserInterface.ShowDatabaseError(1, ex.Message);
-                    System.Environment.Exit(1);
+                    UserInterface.ShowError("Database 1", ex.Message);
                 }
                 dbConn.Close();
             }
@@ -49,7 +48,7 @@ namespace SnowAudit
 
         private static void CheckForExemptionsDB(string exemptionsDatabase, string exemptionsTable)
         {
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
                 try
                 {
@@ -67,39 +66,15 @@ namespace SnowAudit
                 }
                 catch (Exception ex)
                 {
-                    UserInterface.ShowDatabaseError(2, ex.Message);
-                    System.Environment.Exit(1);
+                    UserInterface.ShowError("Database 2", ex.Message);
                 }
                 dbConn.Close();
             }
         }
 
-        private static void DropAuditDB(string dbName)
+        private static void CheckForAuditDB(string dbName)
         {
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
-            {
-                try
-                {
-                    if (dbConn.State == System.Data.ConnectionState.Closed)
-                    {
-                        dbConn.Open();
-                    }
-                    dbConn.ChangeDatabase("master");
-                    SqlCommand cmd = new SqlCommand($"DROP DATABASE IF EXISTS {dbName}", connection: dbConn);
-                    cmd.ExecuteNonQuery();
-                }
-                catch (Exception ex)
-                {
-                    UserInterface.ShowDatabaseError(3, ex.Message);
-                    System.Environment.Exit(1);
-                }
-                dbConn.Close();
-            }
-        }
-
-        private static void CreateAuditDB(string dbName)
-        {
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
                 try
                 {
@@ -111,20 +86,18 @@ namespace SnowAudit
                     cmd.ExecuteNonQuery();
                     cmd = new SqlCommand($"ALTER DATABASE [{dbName}] SET AUTO_CLOSE OFF", connection: dbConn);
                     cmd.ExecuteNonQuery();
-                    dbConn.ChangeDatabase(dbName);
                 }
                 catch (Exception ex)
                 {
-                    UserInterface.ShowDatabaseError(4, ex.Message);
-                    System.Environment.Exit(1);
+                    UserInterface.ShowError("Database 3", ex.Message);
                 }
                 dbConn.Close();
             }
         }
 
-        private static void CreateAuditTable(string dbName)
+        private static void RemoveAuditTables(string dbName)
         {
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
                 try
                 {
@@ -133,61 +106,126 @@ namespace SnowAudit
                         dbConn.Open();
                     }
                     dbConn.ChangeDatabase(dbName);
-                    foreach (string server in AuditProperties.servers)
+                    SqlCommand sql = new SqlCommand("SELECT * FROM INFORMATION_SCHEMA.TABLES", dbConn);
+                    SqlDataReader dataReader = sql.ExecuteReader();
+                    while (dataReader.Read())
                     {
-                        SqlCommand cmd = new SqlCommand($"CREATE TABLE {server} {AuditProperties.dbAuditTableStructure}", connection: dbConn);
-                        cmd.ExecuteNonQuery();
+                        string dropTable = @$"DROP TABLE {dataReader["table_name"].ToString()}";
+                        SqlCommand dropTableCmd = new SqlCommand(dropTable, dbConn);
+                        dropTableCmd.ExecuteNonQuery();
                     }
+
                 }
                 catch (Exception ex)
                 {
-                    UserInterface.ShowDatabaseError(5, ex.Message);
+                    UserInterface.ShowError("Database 4", ex.Message);
                     System.Environment.Exit(1);
                 }
                 dbConn.Close();
             }
         }
 
-        internal static void ImportDataToAuditDB()
+
+        internal static DataSet ReadExcel(DataSet ds)
         {
-            try
+            string dbName = AuditProperties.dbAuditPrefix + AuditProperties.dbServer;
+            DataTable dt = new DataTable();
+
+            foreach (string server in AuditProperties.servers)
             {
-                string dbName = AuditProperties.dbAuditPrefix + AuditProperties.dbServer;
-                foreach (string server in AuditProperties.servers)
+                dt = GetDataTableFromExcel(@$"{inputFilePath}{server}.xlsx", $"{server}", "", true);
+                ds.Tables.Add(dt);
+            }
+            return ds;
+
+        }
+
+        public static DataTable GetDataTableFromExcel(string filePath, string tableName, string sheetname = "", bool hasHeader = true)
+        {
+
+            using (var workbook = new XLWorkbook(filePath))
+            {
+                IXLWorksheet worksheet;
+                if (string.IsNullOrEmpty(sheetname))
+                    worksheet = workbook.Worksheets.First();
+                else
+                    worksheet = workbook.Worksheets.FirstOrDefault(x => x.Name == sheetname);
+
+                var rangeRowFirst = worksheet.FirstRowUsed().RowNumber();
+                var rangeRowLast = worksheet.LastRowUsed().RowNumber();
+                var rangeColFirst = worksheet.FirstColumnUsed().ColumnNumber();
+                var rangeColLast = worksheet.LastColumnUsed().ColumnNumber();
+
+                DataTable tbl = new DataTable();
+                tbl.TableName = tableName;
+                for (int col = rangeColFirst; col <= rangeColLast; col++)
+                    tbl.Columns.Add(hasHeader ? worksheet.FirstRowUsed().Cell(col).Value.ToString() : $"Column {col}");
+                UserInterface.Logger($"Reading data for {tableName}...");
+                rangeRowFirst = rangeRowFirst + (hasHeader ? 1 : 0);
+                var colCount = rangeColLast - rangeColFirst;
+                for (int rowNum = rangeRowFirst; rowNum <= rangeRowLast; rowNum++)
                 {
-                    UserInterface.WriteToConsole($"Importing {server}.xlsx to Database...");
-                    String excelConnString = String.Format("Provider=Microsoft.ACE.OLEDB.12.0;Data Source={0};Extended Properties=\"Excel 12.0\"", AuditProperties.inputFilePath + server + ".xlsx");
-                    //Create Connection to Excel work book 
-                    using (OleDbConnection excelConnection = new OleDbConnection(excelConnString))
+                    List<string> colValues = new List<string>();
+                    for (int col = 1; col <= colCount; col++)
                     {
-                        //Create OleDbCommand to fetch data from Excel 
-                        using (OleDbCommand cmd = new OleDbCommand("Select * FROM ['Page 1$']", excelConnection))
+                        colValues.Add(worksheet.Row(rowNum).Cell(col).Value.ToString());
+                    }
+                    tbl.Rows.Add(colValues.ToArray());
+                }
+                return tbl;
+            }
+        }
+
+        internal static void AutoSqlBulkCopy(DataSet dataSet)
+        {
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
+            {
+                if (dbConn.State == System.Data.ConnectionState.Closed)
+                {
+                    dbConn.Open();
+                }
+                string dbName = AuditProperties.dbAuditPrefix + AuditProperties.dbServer + "audit";
+                dbConn.ChangeDatabase(dbName);
+                foreach (System.Data.DataTable dataTable in dataSet.Tables)
+                {
+                    // checking whether the table selected from the dataset exists in the database or not
+                    var checkTableIfExistsCommand = new SqlCommand("IF EXISTS (SELECT 1 FROM sysobjects WHERE name =  '" + dataTable.TableName + "') SELECT 1 ELSE SELECT 0", dbConn);
+                    var exists = checkTableIfExistsCommand.ExecuteScalar().ToString().Equals("1");
+
+                    // if table does not exist
+                    if (!exists)
+                    {
+                        var createTableBuilder = new StringBuilder("CREATE TABLE [" + dataTable.TableName + "]");
+                        createTableBuilder.AppendLine("(");
+
+                        // selecting each column of the datatable to create a table in the database
+                        foreach (DataColumn dc in dataTable.Columns)
                         {
-                            excelConnection.Open();
-                            using (
-                                OleDbDataReader dReader = cmd.ExecuteReader())
-                            {
-                                using (SqlBulkCopy sqlBulk = new SqlBulkCopy(DBConnectionString))
-                                {
-                                    sqlBulk.DestinationTableName = $"[{dbName}audit].[dbo].[{server}]";
-                                    sqlBulk.WriteToServer(dReader);
-                                }
-                            }
+                            createTableBuilder.AppendLine("  [" + dc.ColumnName + "] VARCHAR(MAX),");
                         }
+
+                        createTableBuilder.Remove(createTableBuilder.Length - 1, 1);
+                        createTableBuilder.AppendLine(")");
+
+                        var createTableCommand = new SqlCommand(createTableBuilder.ToString(), dbConn);
+                        createTableCommand.ExecuteNonQuery();
+                    }
+
+                    // if table exists, just copy the data to the destination table in the database
+                    // copying the data from datatable to database table
+                    using (var bulkCopy = new SqlBulkCopy(dbConn))
+                    {
+                        bulkCopy.DestinationTableName = dataTable.TableName;
+                        bulkCopy.WriteToServer(dataTable);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                UserInterface.ShowDatabaseError(6, ex.Message);
-                System.Environment.Exit(1);
             }
         }
 
         internal static void PerformAudit()
         {
             string outputFile = @$"{AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx";
-            using (SqlConnection dbConn = new SqlConnection(DBConnectionString))
+            using (SqlConnection dbConn = new SqlConnection(dbConnectionString))
             {
                 if (dbConn.State == System.Data.ConnectionState.Closed)
                 {
@@ -203,7 +241,7 @@ namespace SnowAudit
                 // Loop over non-production servers and compare production server > non production for missing servers.
                 foreach (string server in AuditProperties.servers)
                 {
-                    UserInterface.WriteToConsole($"Searching missing values {AuditProperties.productionServer} > {server}...");
+                    UserInterface.Logger($"Searching missing values {AuditProperties.productionServer} > {server}...");
                     string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{AuditProperties.productionServer}' AS 'Primary Instance', '{server}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {AuditProperties.productionServer} T1 LEFT JOIN {server} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                     SqlCommand sql = new SqlCommand(query, dbConn);
                     SqlDataAdapter sda = new SqlDataAdapter(sql);
@@ -216,7 +254,7 @@ namespace SnowAudit
                     //  Compare non-prod > prod for missing values
                     if (server != AuditProperties.productionServer)
                     {
-                        UserInterface.WriteToConsole($"Searching missing values {server} > {AuditProperties.productionServer}...");
+                        UserInterface.Logger($"Searching missing values {server} > {AuditProperties.productionServer}...");
                         string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{AuditProperties.productionServer}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {AuditProperties.productionServer} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                         SqlCommand sql = new SqlCommand(query, dbConn);
                         SqlDataAdapter sda = new SqlDataAdapter(sql);
@@ -229,7 +267,7 @@ namespace SnowAudit
                         // Compare non-prod > other non-prod for missing values
                         if (server != innerServer && server != AuditProperties.productionServer)
                         {
-                            UserInterface.WriteToConsole($"Searching missing values {server} > {innerServer}...");
+                            UserInterface.Logger($"Searching missing values {server} > {innerServer}...");
                             string query = @$"SELECT 'Missing Property' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{innerServer}' AS 'Secondary Instance', T1.Value AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', ISNULL(T2.Value, '') AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {innerServer} T2 ON T1.name = T2.name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T2.name IS NULL AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                             SqlCommand sql = new SqlCommand(query, dbConn);
                             SqlDataAdapter sda = new SqlDataAdapter(sql);
@@ -244,7 +282,7 @@ namespace SnowAudit
                 //Search prod server for mismatches against non-prod servers
                 foreach (string server in AuditProperties.servers)
                 {
-                    UserInterface.WriteToConsole($"Searching value mismatch {AuditProperties.productionServer} > {server}......");
+                    UserInterface.Logger($"Searching value mismatch {AuditProperties.productionServer} > {server}......");
                     string query = @$"SELECT 'Value Mismatch' AS Issue, T1.Name AS 'Property Name', '{AuditProperties.productionServer}' AS 'Primary Instance', '{server}' AS 'Secondary Instance', ISNULL(T3.Value, '') AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', T2.Value AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {AuditProperties.productionServer} T1 LEFT JOIN {server} T2 ON T1.name = T2.name LEFT JOIN {AuditProperties.productionServer} T3 ON T1.Name = T3.Name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T1.Value != T2.Value  AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                     SqlCommand sql = new SqlCommand(query, dbConn);
                     SqlDataAdapter sda = new SqlDataAdapter(sql);
@@ -259,7 +297,7 @@ namespace SnowAudit
                     {
                         if (!mismatchDone.ContainsKey(innerServer) && server != innerServer)
                         {
-                            UserInterface.WriteToConsole($"Searching value mismatch {server} > {innerServer}...");
+                            UserInterface.Logger($"Searching value mismatch {server} > {innerServer}...");
                             string query = @$"SELECT 'Value Mismatch' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{innerServer}' AS 'Secondary Instance', ISNULL(T3.Value, '') AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', T2.Value AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {innerServer} T2 ON T1.name = T2.name LEFT JOIN {AuditProperties.productionServer} T3 ON T1.Name = T3.Name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T1.Value != T2.Value AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                             SqlCommand sql = new SqlCommand(query, dbConn);
                             SqlDataAdapter sda = new SqlDataAdapter(sql);
@@ -283,7 +321,7 @@ namespace SnowAudit
                 }
                 catch (Exception ex)
                 {
-                    UserInterface.ShowDatabaseError(7, ex.Message);
+                    UserInterface.ShowError("Database 7", ex.Message);
                     System.Environment.Exit(1);
                 }
             }

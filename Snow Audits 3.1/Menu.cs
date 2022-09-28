@@ -7,11 +7,6 @@
 //============================================================================
 
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static System.Console;
 
 namespace MenuBuilder
@@ -207,10 +202,10 @@ namespace MenuBuilder
             for (int i = 0; i < _options.Length; i++)
             {
                 SetCursorPosition(_drawMenuRowPos + i, _drawMenuColumnPos);
-                SetConsoleTextColor(ConsoleColor.White, ConsoleColor.Black);
+                SetConsoleTextColor(ConsoleColor.White, ConsoleColor.DarkBlue);
                 if (i == _currentSelection - 1)
                 {
-                    SetConsoleTextColor(ConsoleColor.Black, ConsoleColor.White);
+                    SetConsoleTextColor(ConsoleColor.DarkBlue, ConsoleColor.White);
                     //leftPointer = "  ► ";
                     //rightPointer = " ◄  ";
 
