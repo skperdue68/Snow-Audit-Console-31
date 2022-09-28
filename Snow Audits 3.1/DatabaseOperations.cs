@@ -305,7 +305,7 @@ namespace SnowAudit
                     {
                         if (!mismatchDone.ContainsKey(innerServer) && server != innerServer)
                         {
-                            UserInterface.Logger($"Searching value mismatch {server} > {innerServer}...",false);
+                            UserInterface.Logger($"Searching value mismatch {server} > {innerServer}...", false);
                             string query = @$"SELECT 'Value Mismatch' AS Issue, T1.Name AS 'Property Name', '{server}' AS 'Primary Instance', '{innerServer}' AS 'Secondary Instance', ISNULL(T3.Value, '') AS 'Production Instance Value', T1.Value AS 'Primary Instance Value', T2.Value AS 'Secondary Instance Value', T1.Type AS 'Type', T1.Application AS 'Application', T1.Description AS 'Description' FROM {server} T1 LEFT JOIN {innerServer} T2 ON T1.name = T2.name LEFT JOIN {AuditProperties.productionServer} T3 ON T1.Name = T3.Name LEFT JOIN [{AuditProperties.exemptionsDatabase}].[dbo].[{AuditProperties.exemptionsTable}] e on T1.Name=e.Name WHERE T1.Value != T2.Value AND (e.Name IS NULL OR e.Audit_Type != '{AuditProperties.dbAuditPrefix}')";
                             SqlCommand sql = new SqlCommand(query, dbConn);
                             SqlDataAdapter sda = new SqlDataAdapter(sql);

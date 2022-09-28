@@ -103,17 +103,17 @@ namespace SnowAudit
                     Logger("ERROR: There is an issue with the exemtion table.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 3":
-                    Logger("ERROR: There is an issue verifying or creating the audit database tables.", true,ConsoleColor.DarkRed);
+                    Logger("ERROR: There is an issue verifying or creating the audit database tables.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 4":
                     Logger("ERROR: Unable to remove existing audit server data tables.", true, ConsoleColor.DarkRed);
                     Logger(errorText);
                     break;
                 case "Database 5":
-                    Logger("ERROR: Unable to create audit server data tables.", true,ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to create audit server data tables.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 6":
-                    Logger("ERROR: Unable to import server data to database.", true,ConsoleColor.DarkRed);
+                    Logger("ERROR: Unable to import server data to database.", true, ConsoleColor.DarkRed);
                     break;
                 case "Database 7":
                     Logger("ERROR: Unable to save output file.", true, ConsoleColor.DarkRed);
