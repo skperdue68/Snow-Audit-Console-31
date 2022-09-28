@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
@@ -13,6 +14,7 @@ namespace SnowAudit
     {
         static void Main(string[] args)
         {
+            Console.Title = "SNOW Audits";
             //Display program information
             UserInterface.DisplayInfo();
 
@@ -65,7 +67,7 @@ namespace SnowAudit
             UserInterface.ClearConsole();
             DatabaseOperations.PerformAudit();
             UserInterface.Logger("");
-            UserInterface.Logger(@$"Audit Completed.  Results available as '{AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx'.");
+            UserInterface.Logger(@$"Audit Completed.  Results available as <color>'{AuditProperties.outputFilePath}{AuditProperties.auditType} - {AuditProperties.serverGroup.ToUpper()} RESULTS.xlsx</color>'.", true, ConsoleColor.DarkYellow);
             UserInterface.Pause();
             goto GETSERVERGROUP;
         }
